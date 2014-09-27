@@ -11,10 +11,7 @@ try:
 except ImportError:
     pass
 
-from itertools import (
-    takewhile,
-    dropwhile,
-)
+from collections import OrderedDict
 
 import itertools as it
 
@@ -34,12 +31,13 @@ class ConnectionString(object):
         return self._store.copy()
 
     def load_string(self, string):
-        d = {}
+        self._store = {}
+
         for key, value in self._process_pairs(self._fetch_pairs(string)):
-            if key in self.NON_OVERRIDABLE_KEYS and key in d:
+            if key in self.NON_OVERRIDABLE_KEYS and key in self._store:
                 continue
 
-            d[key] = value
+            self._store[key] = value
 
     NON_OVERRIDABLE_KEYS = {'Provider'}
 
@@ -62,6 +60,15 @@ class ConnectionString(object):
 
             yield key, value
 
+    @staticmethod
+    def _partitionate(string, delimiter):
+        tup = string.partition(delimiter)
+
+        if not tup[1]:
+            raise ValueError('Not found:' + delimiter)
+
+        return tup
+
     @classmethod
     def _fetch_pairs(cls, string):
         """
@@ -69,20 +76,37 @@ class ConnectionString(object):
 
         :param unicode string: connection string to be loaded
 
+        :raises: ValueError when an expected token is not found
+        # TODO [ik45 27.09.2014]: consider a method to include the missing token in the exception
+
         """
-        string = string.lstrip()
+        string = string.strip()
 
         while string:
-            rest = iter(string)
-            key = ''.join(takewhile('='.__ne__, rest)).rstrip()
-            rest = dropwhile(' '.__eq__, rest)
 
-            value = ''.join(takewhile(';'.__ne__, rest)).rstrip()
+            tok_end = string.index('=')
 
+            # If next char is also '=', find next '='
+            if string[tok_end+1] == '=':
+                tok_end = string.index('=', tok_end+2)
+
+            key, string = string[:tok_end].rstrip(), string[tok_end+1:].lstrip()
+            # print 'key: %r -- rest %r' % (key, string)
+
+            first = string[0]
+
+            # If starting with quotes, find the first semicolon after the next quote
+            if first in cls.QUOTES:
+                tok_end = string.index(';', string.index(first, 1))
+            else:
+                tok_end = string.index(';')
+
+            value, string = string[:tok_end].rstrip(), string[tok_end+1:].lstrip()
+
+            # print 'val: %r -- rest %r' % (value, string)
             yield key, value
-            string = ''.join(rest).lstrip()
 
-    QUOTES = ('"', "'")
+    QUOTES = {'"', "'"}
     SPECIAL_CHARS = {'"', "'", ';', '='}
 
     def get_string(self):
@@ -97,7 +121,7 @@ class ConnectionString(object):
     def __repr__(self):
         return '<ConnectionString "%s">' % self.get_string()
 
-    _meta__COMPOSED_CLASS = dict
+    _meta__COMPOSED_CLASS = OrderedDict
     _meta__EXPOSED_METHODS = [
         'keys', 'iterkeys', 'values', 'itervalues', 'viewitems', 'viewvalues',
         '__iter__', 'update', 'get', 'copy', '__getitem__', '__setitem__', 'iteritems',
@@ -124,7 +148,7 @@ class ConnectionString(object):
             # Expose the declared attributes, (as longs as the exist in the container class)
             attrs.update({
                 name: create_proxy(name)
-                for name in filter(vars(composed_class).__contains__, attrs.pop('_meta__EXPOSED_METHODS'))
+                for name in filter(lambda attr: hasattr(composed_class, attr), attrs.pop('_meta__EXPOSED_METHODS'))
             })
 
             return type(cls_name, bases, attrs)
