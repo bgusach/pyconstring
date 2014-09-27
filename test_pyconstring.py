@@ -76,3 +76,28 @@ class TestConnectionString(unittest.TestCase):
         """
         obj = ConnectionString('Key==2=value;')
         self.assertEqual(obj['Key==2'], 'value')
+
+    def test_6(self):
+        """
+        Keys are properly formatted
+
+        """
+        obj = ConnectionString('key=value;')
+
+        self.assertTrue('key' not in obj)
+        self.assertTrue('Key' in obj)
+
+        # Now with another key formatter
+        obj = ConnectionString('key=value;', key_formatter=lambda x: x.upper())
+        self.assertTrue('key' not in obj)
+        self.assertTrue('KEY' in obj)
+
+    def test_7(self):
+        """
+        Keys are formatted before look up
+
+        """
+        obj = ConnectionString('key=value;')
+
+        self.assertEqual(obj['kEY'], 'value')
+

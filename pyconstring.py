@@ -6,24 +6,24 @@
 
 from __future__ import unicode_literals
 
-try:
-    from itertools import izip as zip
-except ImportError:
-    pass
-
 from collections import OrderedDict
+from operator import methodcaller
 
-import itertools as it
+
+class ParseError(Exception):
+    pass
 
 
 class ConnectionString(object):
 
-    def __init__(self, string=''):
+    def __init__(self, string='', key_formatter=methodcaller('capitalize')):
         """
         :param unicode string: connection string
 
         """
         self._store = self._meta__COMPOSED_CLASS()
+        self._key_formatter = key_formatter
+
         self.load_string(string)
 
     @property
@@ -33,13 +33,15 @@ class ConnectionString(object):
     def load_string(self, string):
         self._store = {}
 
-        for key, value in self._process_pairs(self._fetch_pairs(string)):
+        pairs = self._process_pairs(self._fetch_pairs(string))
+
+        for key, value in ((self._key_formatter(k), v) for k, v in pairs):
             if key in self.NON_OVERRIDABLE_KEYS and key in self._store:
                 continue
 
             self._store[key] = value
 
-    NON_OVERRIDABLE_KEYS = {'Provider'}
+    NON_OVERRIDABLE_KEYS = frozenset(['Provider'])
 
     @classmethod
     def _process_pairs(cls, pairs):
@@ -60,14 +62,7 @@ class ConnectionString(object):
 
             yield key, value
 
-    @staticmethod
-    def _partitionate(string, delimiter):
-        tup = string.partition(delimiter)
-
-        if not tup[1]:
-            raise ValueError('Not found:' + delimiter)
-
-        return tup
+    __getitem__ = lambda self, *args: self._store[self._key_formatter(*args)]
 
     @classmethod
     def _fetch_pairs(cls, string):
@@ -124,7 +119,9 @@ class ConnectionString(object):
     _meta__COMPOSED_CLASS = OrderedDict
     _meta__EXPOSED_METHODS = [
         'keys', 'iterkeys', 'values', 'itervalues', 'viewitems', 'viewvalues',
-        '__iter__', 'update', 'get', 'copy', '__getitem__', '__setitem__', 'iteritems',
+        '__iter__', 'update', 'get', 'copy',
+        # '__getitem__',
+        '__setitem__', 'iteritems',
     ]
 
     class __metaclass__(type):
