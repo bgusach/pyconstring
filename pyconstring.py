@@ -16,17 +16,16 @@ class ParseError(Exception):
 
 class ConnectionString(object):
 
-    def __init__(self, string='', key_formatter=methodcaller('capitalize'), key_translator=lambda k: k):
+    def __init__(self, string='', key_formatter=methodcaller('title'), key_translator=None,
+                 prio_keys=('Provider',)):
         """
         :param unicode string: connection string
 
         """
         self._store = self._meta__COMPOSED_CLASS()
-        self._key_formatter = key_formatter
-        # TODO [ik45 28.09.2014]: implement translation!
-        self._key_translator = key_translator
-
-        # TODO [ik45 28.09.2014]: NON_OVERRIDABLE_KEYS have to be processed as well by key_formatter!
+        self._key_formatter = key_formatter or (lambda k: k)
+        self._key_translator = key_translator or (lambda k: k)
+        self._priority_keys = {self._key_formatter(k) for k in prio_keys}
 
         self.load_string(string)
 
@@ -35,59 +34,99 @@ class ConnectionString(object):
         return self._store.copy()
 
     def load_string(self, string):
-        self._store = {}
+        self._store = self._meta__COMPOSED_CLASS()
 
-        pairs = self._process_pairs(self._fetch_pairs(string))
+        pairs = self._fetch_pairs(string)
 
-        for key, value in pairs:
+        for key, value in (self._decode_pair(k, v) for k, v in pairs if self._is_settable(k)):
             self._store_pair(key, value)
 
-    NON_OVERRIDABLE_KEYS = frozenset(['Provider'])
+    @staticmethod
+    def _decode_key(key):
+        if not key:
+            raise ValueError('Key cannot be empty string')
+
+        return key.strip().replace('==', '=')
+
+    @staticmethod
+    def _encode_key(key):
+        if not key:
+            raise ValueError('Key cannot be empty string')
+
+        return key.strip().replace('=', '==')
 
     @classmethod
-    def _process_pairs(cls, pairs):
-        """
-        Removes quotation and checks that key and values are correct
+    def _decode_value(cls, val):
+        val = val.strip()
 
-        :param pairs:
-        :return:
-        """
-        for key, value in pairs:
+        # Empty string
+        if not val:
+            return val
 
-            start_value = value[0]
-            if start_value in cls.QUOTES:
-                if not value.endswith(start_value):
-                    raise Exception('Incorrect quotation')
+        start = val[0]
+        if start not in cls.QUOTES:
+            return val
 
-                value = value.strip(start_value)
+        if not val.endswith(start) or len(val) == 1:  # just a quote is a wrong value
+            # TODO [ik45 28.09.2014]: concrete exception
+            raise ValueError('Incorrect quotation')
 
-            yield key, value
+        return val[1:-1].replace(start * 2, start)
+
+    @classmethod
+    def _encode_pair(cls, key, val):
+        return cls._encode_key(key), cls._encode_value(val)
+
+    @classmethod
+    def _decode_pair(cls, key, val):
+        return cls._decode_key(key), cls._decode_value(val)
+
+    @classmethod
+    def _encode_value(cls, val):
+        if not val:
+            return val
+
+        if not (val.startswith(' ') or val.endswith(' ') or ';' in val or val[0] in cls.QUOTES):
+            return val
+
+        # Find out what kind of quotes we need to use
+        quotes_in_val = cls.QUOTES.intersection(val)
+
+        if not quotes_in_val:  # If no quotes, just use double
+            return '"%s"' % val
+
+        if len(quotes_in_val) == 1:
+            return '{quote}{val}{quote}'.format(val=val, quote=cls.QUOTES.difference(quotes_in_val).pop())
+
+        # If both types of quotes in string, escape the double quotes by doubling them
+        return '"%s"' % val.replace('"', '""')
 
     def _store_pair(self, key, value):
         """
         Stores key-value pair, applying formatting to the key
 
         """
-        # TODO [ik45 28.09.2014]: partially wrong! we do want to override explicitly some keys
-        key = self._key_formatter(key.strip())
-        if key in self.NON_OVERRIDABLE_KEYS:
-            return
-
-        self._store[key] = value
-
-    def __setitem__(self, key, value):
-        key = self._key_formatter(key)
-        if key.endswith('='):
-            raise KeyError(key)
-
-        raise NotImplementedError
         self._store[self._key_formatter(key)] = value
+
+    def _is_settable(self, key):
+        """
+        Returns whether the key can be set or not
+
+        :rtype: bool
+
+        """
+        return key not in self._priority_keys or key not in self._store
 
     @classmethod
     def fromdict(self):
         raise NotImplementedError
 
+    @classmethod
+    def fromstring(cls):
+        raise NotImplementedError
+
     __getitem__ = lambda self, key: self._store[self._key_formatter(key)]
+    __setitem__ = lambda self, key, value: self._store.__setitem__(key, value)
 
     @classmethod
     def _fetch_pairs(cls, string):
@@ -101,6 +140,8 @@ class ConnectionString(object):
 
         """
         string = string.strip()
+        if not string.endswith(';'):
+            string += ';'
 
         while string:
 
@@ -115,9 +156,19 @@ class ConnectionString(object):
 
             first = string[0]
 
-            # If starting with quotes, find the first semicolon after the next quote
+            # If first char is quote, find the first semicolon after the next quote
             if first in cls.QUOTES:
-                tok_end = string.index(';', string.index(first, 1))
+                last_quote_pos = 0
+
+                while True:
+                    tok_end = string.index(';', string.index(first, last_quote_pos+1))
+
+                    # If next char is not a quote, we found the end of the literal
+                    if string[tok_end+1:tok_end+2] != first:
+                        break
+
+                    # Otherwise, keep searching
+                    last_quote_pos = tok_end
             else:
                 tok_end = string.index(';')
 
@@ -130,32 +181,20 @@ class ConnectionString(object):
     SPECIAL_CHARS = {'"', "'", ';', '='}
     SPECIAL_VALUE_STARTER = {' ', '"', "'"}
 
-    def string(self):
+    def resolve(self):
         """
         Returns the composed string
 
         :rtype: unicode
 
         """
-        def format(key, val):
-            if '=' in key:
-                key = key.replace('=', '==')
-            if val.startswith(' '):
-                val = '"%s"' % val
+        if not self._store:
+            return ''
 
-            if not self.SPECIAL_CHARS.intersection(val):
-                return key, val
-
-            quote = self.QUOTES.intersection(val)
-            if not quote:
-                return key, '"%s"' % val
-
-
-
-        return ';'.join('%s=%s' % pair for pair in self._store.iteritems())
+        return ';'.join('%s=%s' % (self._encode_key(k), self._encode_value(v)) for k, v in self._store.iteritems()) + ';'
 
     def __repr__(self):
-        return '<ConnectionString "%s">' % self.string
+        return '<ConnectionString %s>' % self.resolve()
 
     _meta__COMPOSED_CLASS = OrderedDict
     _meta__EXPOSED_METHODS = [
