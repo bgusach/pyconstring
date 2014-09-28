@@ -24,7 +24,7 @@ class TestConnectionString(unittest.TestCase):
             'Provider': 'someone',
             'User': 'bartolo',
         }
-        obj = ConnectionString(cs)
+        obj = ConnectionString.from_string(cs)
 
         for key, val in expected.iteritems():
             self.assertEqual(obj[key], val)
@@ -44,7 +44,7 @@ class TestConnectionString(unittest.TestCase):
         expected = {
             prio_key: 'initial',
         }
-        obj = ConnectionString(';'.join('%s=%s' % p for p in pairs) + ';', prio_keys=[prio_key], key_formatter=None)
+        obj = ConnectionString.from_string(';'.join('%s=%s' % p for p in pairs) + ';', prio_keys=[prio_key], key_formatter=None)
 
         for key, val in expected.iteritems():
             self.assertEqual(obj[key], val)
@@ -58,7 +58,7 @@ class TestConnectionString(unittest.TestCase):
         for q1, q2 in itertools.product('"', "'"):
             val = template % q2  # Insert a quote of the other type to make it more messy
             cs = 'Key1={q1}{val}{q1};'.format(q1=q1, val=val)
-            obj = ConnectionString(cs)
+            obj = ConnectionString.from_string(cs)
             self.assertEqual(obj['Key1'], val)
 
     def test_4(self):
@@ -66,7 +66,7 @@ class TestConnectionString(unittest.TestCase):
         Spaces are properly stripped
 
         """
-        obj = ConnectionString('    Key   =   value   ;')
+        obj = ConnectionString.from_string('    Key   =   value   ;')
         self.assertEqual(obj['Key'], 'value')
 
     def test_5(self):
@@ -74,7 +74,7 @@ class TestConnectionString(unittest.TestCase):
         Double equal signs are converted to one in the key
 
         """
-        obj = ConnectionString('Key==2=value;')
+        obj = ConnectionString.from_string('Key==2=value;')
         self.assertEqual(obj['Key=2'], 'value')
 
     def test_6(self):
@@ -82,13 +82,13 @@ class TestConnectionString(unittest.TestCase):
         Keys are properly formatted
 
         """
-        obj = ConnectionString('cool key  =value;')
+        obj = ConnectionString.from_string('cool key  =value;')
 
         self.assertTrue('cool key' not in obj)
         self.assertTrue('Cool Key' in obj)
 
         # Now with another key formatter
-        obj = ConnectionString('key=value;', key_formatter=lambda x: x.upper())
+        obj = ConnectionString.from_string('key=value;', key_formatter=lambda x: x.upper())
         self.assertTrue('key' not in obj)
         self.assertTrue('KEY' in obj)
 
@@ -97,7 +97,7 @@ class TestConnectionString(unittest.TestCase):
         Keys are formatted before look up
 
         """
-        obj = ConnectionString('key=value;')
+        obj = ConnectionString.from_string('key=value;')
 
         self.assertEqual(obj['kEY'], 'value')
 
@@ -106,15 +106,15 @@ class TestConnectionString(unittest.TestCase):
     #     If the value starts with '=', it will be quoted
     #
     #     """
-    #     obj = ConnectionString('key==value;')
-    #     assert
+    #     obj = ConnectionString.from_string('key==value;')
+    #     # assert
 
     def test_9(self):
         """
         Connection strings without trailing ';' are also processed
 
         """
-        obj = ConnectionString('huehue=troll')
+        obj = ConnectionString.from_string('huehue=troll')
         self.assertEqual(obj['huehue'], 'troll')
 
     def test_10(self):
@@ -122,5 +122,5 @@ class TestConnectionString(unittest.TestCase):
         Double quotes in literals are converted to one (escaping system)
 
         """
-        obj = ConnectionString('huehue="troll\'s friend name is ""johnny""";')
+        obj = ConnectionString.from_string('huehue="troll\'s friend name is ""johnny""";')
         self.assertEqual(obj['huehue'], 'troll\'s friend name is "johnny"')
