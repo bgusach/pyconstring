@@ -16,13 +16,17 @@ class ParseError(Exception):
 
 class ConnectionString(object):
 
-    def __init__(self, string='', key_formatter=methodcaller('capitalize')):
+    def __init__(self, string='', key_formatter=methodcaller('capitalize'), key_translator=lambda k: k):
         """
         :param unicode string: connection string
 
         """
         self._store = self._meta__COMPOSED_CLASS()
         self._key_formatter = key_formatter
+        # TODO [ik45 28.09.2014]: implement translation!
+        self._key_translator = key_translator
+
+        # TODO [ik45 28.09.2014]: NON_OVERRIDABLE_KEYS have to be processed as well by key_formatter!
 
         self.load_string(string)
 
@@ -35,11 +39,8 @@ class ConnectionString(object):
 
         pairs = self._process_pairs(self._fetch_pairs(string))
 
-        for key, value in ((self._key_formatter(k), v) for k, v in pairs):
-            if key in self.NON_OVERRIDABLE_KEYS and key in self._store:
-                continue
-
-            self._store[key] = value
+        for key, value in pairs:
+            self._store_pair(key, value)
 
     NON_OVERRIDABLE_KEYS = frozenset(['Provider'])
 
@@ -62,7 +63,31 @@ class ConnectionString(object):
 
             yield key, value
 
-    __getitem__ = lambda self, *args: self._store[self._key_formatter(*args)]
+    def _store_pair(self, key, value):
+        """
+        Stores key-value pair, applying formatting to the key
+
+        """
+        # TODO [ik45 28.09.2014]: partially wrong! we do want to override explicitly some keys
+        key = self._key_formatter(key.strip())
+        if key in self.NON_OVERRIDABLE_KEYS:
+            return
+
+        self._store[key] = value
+
+    def __setitem__(self, key, value):
+        key = self._key_formatter(key)
+        if key.endswith('='):
+            raise KeyError(key)
+
+        raise NotImplementedError
+        self._store[self._key_formatter(key)] = value
+
+    @classmethod
+    def fromdict(self):
+        raise NotImplementedError
+
+    __getitem__ = lambda self, key: self._store[self._key_formatter(key)]
 
     @classmethod
     def _fetch_pairs(cls, string):
@@ -103,18 +128,34 @@ class ConnectionString(object):
 
     QUOTES = {'"', "'"}
     SPECIAL_CHARS = {'"', "'", ';', '='}
+    SPECIAL_VALUE_STARTER = {' ', '"', "'"}
 
-    def get_string(self):
+    def string(self):
         """
         Returns the composed string
 
         :rtype: unicode
 
         """
+        def format(key, val):
+            if '=' in key:
+                key = key.replace('=', '==')
+            if val.startswith(' '):
+                val = '"%s"' % val
+
+            if not self.SPECIAL_CHARS.intersection(val):
+                return key, val
+
+            quote = self.QUOTES.intersection(val)
+            if not quote:
+                return key, '"%s"' % val
+
+
+
         return ';'.join('%s=%s' % pair for pair in self._store.iteritems())
 
     def __repr__(self):
-        return '<ConnectionString "%s">' % self.get_string()
+        return '<ConnectionString "%s">' % self.string
 
     _meta__COMPOSED_CLASS = OrderedDict
     _meta__EXPOSED_METHODS = [
