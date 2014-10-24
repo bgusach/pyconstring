@@ -84,16 +84,14 @@ class TestConnectionString(unittest.TestCase):
         """
         obj = ConnectionString.from_string('cool key  =value;')
 
-        self.assertTrue('cool key' not in obj)
-        self.assertTrue('Cool Key' in obj)
+        assert 'Cool Key' in obj.resolve()
 
         # Now with another key formatter
         class ConnStr2(ConnectionString):
             _key_formatter = staticmethod(lambda k: k.upper())
 
         obj = ConnStr2.from_string('key=value;')
-        self.assertTrue('key' not in obj)
-        self.assertTrue('KEY' in obj)
+        self.assertTrue('KEY' in obj.resolve())
 
     def test_7(self):
         """
@@ -227,6 +225,15 @@ class TestConnectionString(unittest.TestCase):
 
         self.assertEqual(obj['Huehue'], 'troll')
 
+    def test_20(self):
+        """
+        Deleting works
+
+        """
+        obj = ConnectionString.from_dict({'huehue': 'troll'})
+        assert 'huehue' in obj
+        del obj['huehue']
+        assert 'huehue' not in obj
 
 
 

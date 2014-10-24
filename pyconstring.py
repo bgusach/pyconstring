@@ -35,7 +35,7 @@ class ConnectionString(object):
     # Methods of the container class to be exposed on the ConnectionString interface
     _container_exposed_methods = [
         'keys', 'iterkeys', 'values', 'itervalues', 'viewitems', 'viewvalues',
-        '__iter__', 'get', 'items', 'iteritems', '__len__', '__contains__'
+        '__iter__', 'get', 'items', 'iteritems', '__len__',
     ]
 
     def __init__(self):
@@ -243,6 +243,7 @@ class ConnectionString(object):
     __getitem__ = lambda self, key: self._store.__getitem__(self._key_formatter(key))
     __setitem__ = lambda self, key, value: self._store.__setitem__(self._key_formatter(key), value)
     __delitem__ = lambda self, key: self._store.__delitem__(self._key_formatter(key))
+    __contains__ = lambda self, key: self._store.__contains__(self._key_formatter(key))
 
     _QUOTES = {'"', "'"}
 
@@ -350,7 +351,6 @@ class ConnectionString(object):
         Metaclass to expose declared attributes
 
         """
-
         def __new__(mcs, cls_name, bases, attrs):
 
             def create_proxy(method_name):
