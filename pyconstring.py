@@ -16,6 +16,7 @@ from operator import methodcaller
 __all__ = ['ConnectionString']
 
 
+
 class ConnectionString(object):
 
     # Following attributes can be overridden to customize behaviour
@@ -356,12 +357,14 @@ class ConnectionString(object):
             def create_proxy(method_name):
                 """
                 Creates a function that redirects the call to the underlying store object for the `method_name`
-                """
 
+                :param bytes method_name: name of method to be exposed
+
+                """
                 def proxy(self, *args, **kwargs):
                     return getattr(self._store, method_name)(*args, **kwargs)
 
-                proxy.__name__ = str(method_name)
+                proxy.__name__ = bytes(method_name)
 
                 return proxy
 
