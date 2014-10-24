@@ -34,7 +34,7 @@ class TestConnectionString(unittest.TestCase):
         'Priority' keys are not overridden
 
         """
-        prio_key = 'some key'
+        prio_key = ConnectionString._non_overridable_keys[0]
 
         pairs = [
             (prio_key, 'initial'),
@@ -44,7 +44,7 @@ class TestConnectionString(unittest.TestCase):
         expected = {
             prio_key: 'initial',
         }
-        obj = ConnectionString.from_string(';'.join('%s=%s' % p for p in pairs) + ';', prio_keys=[prio_key], key_formatter=None)
+        obj = ConnectionString.from_string(';'.join('%s=%s' % p for p in pairs) + ';')
 
         for key, val in expected.iteritems():
             self.assertEqual(obj[key], val)
@@ -88,7 +88,10 @@ class TestConnectionString(unittest.TestCase):
         self.assertTrue('Cool Key' in obj)
 
         # Now with another key formatter
-        obj = ConnectionString.from_string('key=value;', key_formatter=lambda x: x.upper())
+        class ConnStr2(ConnectionString):
+            _key_formatter = staticmethod(lambda k: k.upper())
+
+        obj = ConnStr2.from_string('key=value;')
         self.assertTrue('key' not in obj)
         self.assertTrue('KEY' in obj)
 
@@ -101,13 +104,13 @@ class TestConnectionString(unittest.TestCase):
 
         self.assertEqual(obj['kEY'], 'value')
 
-    # def test_8(self):
-    #     """
-    #     If the value starts with '=', it will be quoted
-    #
-    #     """
-    #     obj = ConnectionString.from_string('key==value;')
-    #     # assert
+    def test_8(self):
+        """
+        Value starting with = and properly quoted, is read properly
+
+        """
+        obj = ConnectionString.from_string('key="=value";')
+        self.assertEqual(obj['key'], '=value')
 
     def test_9(self):
         """
@@ -124,3 +127,108 @@ class TestConnectionString(unittest.TestCase):
         """
         obj = ConnectionString.from_string('huehue="troll\'s friend name is ""johnny""";')
         self.assertEqual(obj['huehue'], 'troll\'s friend name is "johnny"')
+
+    def test_11(self):
+        """
+        Exposed methods of storage work fine
+
+        """
+        obj = ConnectionString.from_string('Huehue=troll;')
+
+        self.assertEqual(len(obj), 1)
+        self.assertTrue('Huehue' in obj)
+        self.assertEqual('troll', obj.get('Huehue'))
+        self.assertEqual('default', obj.get('wrong key', 'default'))
+
+    def test_12(self):
+        """
+        Loading an empty string produces an empty ConnectionString object
+
+        """
+        obj = ConnectionString.from_string('')
+        assert len(obj) == 0
+
+    def test_13(self):
+        """
+        Casting the ConnectionString object returns the connection string
+
+        """
+        con_string = 'Huehue=troll;'
+        obj = ConnectionString.from_string(con_string)
+
+        self.assertEqual(str(obj), con_string)
+
+        # Make the test py3k compatible
+        try:
+            self.assertEqual(unicode(obj), con_string)
+        except NameError:
+            pass
+
+    def test_14(self):
+        """
+        Copying works
+
+        """
+        obj = ConnectionString.from_string('Huehue=troll;')
+        obj2 = obj.copy()
+
+        self.assertEqual(str(obj), str(obj2))
+
+    def test_15(self):
+        """
+        Update works with other ConnectionString object
+
+        """
+        obj = ConnectionString.from_string('Huehue=troll;')
+        obj2 = ConnectionString.from_string('Waldo=faldo;')
+
+        obj.update(obj2)
+        self.assertEqual(obj['Waldo'], 'faldo')
+
+    def test_16(self):
+        """
+        Update works with a standard dict
+
+        """
+        obj = ConnectionString.from_string('Huehue=troll;')
+        d = {'huehue': 'shutupandtakemymoney'}
+
+        obj.update(d)
+        self.assertEqual(obj['Huehue'], 'shutupandtakemymoney')
+
+    def test_17(self):
+        """
+        Update works with a iterable of key-values
+
+        """
+        obj = ConnectionString.from_string('Huehue=troll;')
+        d = {'huehue': 'shutupandtakemymoney'}
+
+        obj.update(d.iteritems())
+        self.assertEqual(obj['Huehue'], 'shutupandtakemymoney')
+
+    def test_18(self):
+        """
+        Creating from dictionary works
+
+        """
+        d = {'huehue': 'troll'}
+        obj = ConnectionString.from_dict(d)
+
+        self.assertEqual(obj['Huehue'], 'troll')
+
+    def test_19(self):
+        """
+        Creating from iterable works
+
+        """
+        d = {'huehue': 'troll'}
+        obj = ConnectionString.from_iterable(d.iteritems())
+
+        self.assertEqual(obj['Huehue'], 'troll')
+
+
+
+
+
+
