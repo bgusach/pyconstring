@@ -1,9 +1,5 @@
 # coding: utf-8
 
-"""
-
-"""
-
 from __future__ import unicode_literals
 
 import re
@@ -14,7 +10,7 @@ from operator import methodcaller
 
 
 __all__ = ['ConnectionString']
-
+__version__ = '0.1'
 
 
 class ConnectionString(object):
