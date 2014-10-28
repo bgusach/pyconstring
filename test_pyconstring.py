@@ -235,7 +235,39 @@ class TestConnectionString(unittest.TestCase):
         del obj['huehue']
         assert 'huehue' not in obj
 
+    def test_21(self):
+        """
+        Invalid connection strings are rejected
 
+        """
+        invalid_strs = [
+            'key==value;',
+            'key="value;',
+            'key=\'value;',
+            'key=val;ue;',
+            'key="hey"there";',
+            "key='hey'there';",
+        ]
 
+        for s in invalid_strs:
+            with self.assertRaises(ValueError):
+                ConnectionString.from_string(s)
 
+    def test_22(self):
+        """
+        Translator works
 
+        """
+        class ConStr2(ConnectionString):
+
+            @staticmethod
+            def _key_translator(key):
+                key = key.lower()
+                return {
+                    'one': 'eins',
+                    'two': 'dos',
+                    'user': 'huehue'
+                }.get(key, key)
+
+        obj = ConStr2.from_string('One=1;Two=2;User=me;Unknown=33;')
+        self.assertEqual(obj.resolve(), 'Eins=1;Dos=2;Huehue=me;Unknown=33;')

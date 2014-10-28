@@ -10,7 +10,7 @@ from operator import methodcaller
 
 
 __all__ = ['ConnectionString']
-__version__ = '0.1'
+__version__ = '0.1.0'
 
 
 class ConnectionString(object):
@@ -53,8 +53,7 @@ class ConnectionString(object):
         :param unicode string: connection string to be loaded
 
         """
-        if string:
-            self._load_pairs(self._fetch_pairs(string), no_overriding=True)
+        self._load_pairs(self._fetch_tokens(string), no_overriding=True)
 
     def _load_pairs(self, pairs, no_overriding=False):
         """
@@ -117,12 +116,8 @@ class ConnectionString(object):
 
         # If it does not start with quotes, no decoding needed
         start = val[0]
-        if start not in cls._QUOTES:
+        if start not in cls._quotes:
             return val
-
-        # Handle value starting with quote but not finishing with quote as well
-        if not val.endswith(start) or len(val) == 1:  # just a quote is a wrong value
-            raise ValueError('Incorrect quotation')
 
         # Remove wrapping quotes, and reduce any double inner quote
         return val[1:-1].replace(start * 2, start)
@@ -146,12 +141,12 @@ class ConnectionString(object):
             val.startswith(' ')
             or val.endswith(' ')
             or ';' in val
-            or val[0] in cls._QUOTES  # Starts with quotes
+            or val[0] in cls._quotes  # Starts with quotes
         ):
             return val
 
         # Get what kind of quotes are present in value
-        quotes_in_val = cls._QUOTES.intersection(val)
+        quotes_in_val = cls._quotes.intersection(val)
 
         # If no quotes, just use double
         if not quotes_in_val:
@@ -159,7 +154,7 @@ class ConnectionString(object):
 
         # If only one type, use the other one to quote around
         if len(quotes_in_val) == 1:
-            return '{quote}{val}{quote}'.format(val=val, quote=cls._QUOTES.difference(quotes_in_val).pop())
+            return '{quote}{val}{quote}'.format(val=val, quote=cls._quotes.difference(quotes_in_val).pop())
 
         # If both types of quotes in string, escape the double quotes by doubling them
         return '"%s"' % val.replace('"', '""')
@@ -182,10 +177,11 @@ class ConnectionString(object):
 
     def _store_pair(self, key, value):
         """
-        Stores key-value pair, applying formatting to the key
+        Stores key-value pair, applying translation and formatting to the key
 
         """
-        self._store[self._key_formatter(key)] = value
+        processed_key = self._key_formatter(self._key_translator(key))
+        self._store[processed_key] = value
 
     def _is_settable(self, key):
         """
@@ -238,22 +234,15 @@ class ConnectionString(object):
 
     # Direct Item access needs key formatting
     __getitem__ = lambda self, key: self._store.__getitem__(self._key_formatter(key))
-    __setitem__ = lambda self, key, value: self._store.__setitem__(self._key_formatter(key), value)
+    __setitem__ = _store_pair
     __delitem__ = lambda self, key: self._store.__delitem__(self._key_formatter(key))
     __contains__ = lambda self, key: self._store.__contains__(self._key_formatter(key))
 
-    _QUOTES = {'"', "'"}
-
-    _RES = {
-        '=': re.compile('[^=](=)[^=]'),
-        '"': re.compile('(?:[""]*)"\s*(;)'),
-        "'": re.compile("(?:['']*)'\s*(;)"),
-        ';': re.compile('(;)'),
-        'nonblank': re.compile('\S'),
-    }
+    _quotes = {'"', "'"}
+    _re_nonblank = re.compile('\S')
 
     @classmethod
-    def _fetch_pairs(cls, string):
+    def _fetch_tokens(cls, string):
         """
         Parses the string and stores its parameters. Overwrites any existing state.
 
@@ -271,30 +260,52 @@ class ConnectionString(object):
         while tok_start < last_start:
 
             # Identify first non double equal sign
-            match = cls._RES['='].search(string, tok_start)
-            if not match:
-                raise ValueError('Token not found: "="')
+            sub_start = tok_start
+            while True:
+                pos = string.find('=', sub_start)
+                if pos == -1:
+                    raise ValueError('Token delimiter not found: "="')
 
-            tok_end = match.start(1)
+                if string[pos+1:pos+2] == '=':
+                    sub_start = pos + 2
+                    continue
+
+                tok_end = pos
+                break
+
             key = string[tok_start:tok_end]
 
             tok_start = tok_end + 1
 
             # Find next non blank character
-            match = cls._RES['nonblank'].search(string, tok_start)
+            match = cls._re_nonblank.search(string, tok_start)
             if not match:
-                raise ValueError('Only blank characters after key delimiter "="')
+                raise ValueError('No value after key delimiter "="')
 
             tok_start = match.start(0)
 
-            # If nonblank char is a quote, use corresponding regex to closing quote + ';'. Otherwise just look for ';'
-            match = cls._RES.get(match.group(0), cls._RES[';']).search(string, tok_start)
-            if not match:
-                raise ValueError('Token not found ";"')
+            first = match.group(0)
+            # If first char is not a quote, just search for ';'
+            if first not in cls._quotes:
+                tok_end = string.find(';', tok_start)
 
-            tok_end = match.start(1)
-            value = string[tok_start:tok_end]
+            # If quote, find the end of the quotation
+            else:
+                sub_start = tok_start + 1
+                while True:
+                    pos = string.find(first, sub_start)
+                    if pos == -1:
+                        raise ValueError('Token delimiter not found: "%s"' % first)
 
+                    # If it is a double quote, skip and keep searching
+                    if string[pos] == string[pos + 1]:
+                        sub_start = pos + 2
+                        continue
+
+                    tok_end = pos + 1
+                    break
+
+            value = string[tok_start:tok_end].strip()
             yield key, value
 
             tok_start = tok_end + 1
