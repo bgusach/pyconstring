@@ -271,3 +271,18 @@ class TestConnectionString(unittest.TestCase):
 
         obj = ConStr2.from_string('One=1;Two=2;User=me;Unknown=33;')
         self.assertEqual(obj.resolve(), 'Eins=1;Dos=2;Huehue=me;Unknown=33;')
+
+    def test_23(self):
+        """
+        Star unpacking works
+
+        """
+        obj = ConnectionString.from_string('Provider=someone;User=bartolo;')
+        self.assertEqual((lambda **kw: kw)(**obj), {'Provider': 'someone', 'User': 'bartolo'})
+
+    def test_24(self):
+        """
+        When instantiating from a dictionary, spaces are preserved
+
+        """
+        raise NotImplementedError
