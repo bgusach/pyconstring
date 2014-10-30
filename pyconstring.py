@@ -53,7 +53,7 @@ class ConnectionString(object):
         :param unicode string: connection string to be loaded
 
         """
-        self._load_pairs(self._fetch_tokens(string), no_overriding=True)
+        self._load_pairs(self._fetch_tokens(string.strip()), no_overriding=True)
 
     def _load_pairs(self, pairs, no_overriding=False):
         """
@@ -239,7 +239,56 @@ class ConnectionString(object):
     __contains__ = lambda self, key: self._store.__contains__(self._key_formatter(key))
 
     _quotes = {'"', "'"}
-    _re_nonblank = re.compile('\S')
+
+    @classmethod
+    def _fetch_key(cls, string):
+        """
+        Receives a stripped string, identifies the heading key, and returns a tuple (key, rest of the string)
+
+        :param unicode string: substring of connection string
+        :returns: rest of string left stripped and without any leading '='
+        :rtype: unicode
+
+        """
+        start = 0
+        while True:
+            pos = string.find('=', start)
+            if pos == -1:
+                raise ValueError('Token delimiter not found: "="')
+
+            if string[pos+1:pos+2] == '=':
+                start = pos + 2
+                continue
+
+            return string[:pos], string[pos+1:].lstrip()
+
+    @classmethod
+    def _fetch_value(cls, string):
+        """
+        Receives a stripped string, identifies the heading value, and returns a tuple (key, rest of the string)
+
+        :param unicode string: substring of connection string
+        :returns: rest of string left stripped and without any leading ';'
+        :rtype: unicode
+
+        """
+        first = string[0]
+        if first not in cls._quotes:
+            value, _, string = string.partition(';')
+            return value, string
+
+        start = 1
+        while True:
+            pos = string.find(first, start)
+            if pos == -1:
+                raise ValueError('Token delimiter not found: "%s"' % first)
+
+            # If it is a double quote, skip and keep searching
+            if string[pos] == string[pos+1]:
+                start = pos + 2
+                continue
+
+            return string[:pos+1], string[pos+1:].lstrip(' ;')  # Eliminate
 
     @classmethod
     def _fetch_tokens(cls, string):
@@ -250,65 +299,10 @@ class ConnectionString(object):
         :raises: ValueError when an expected token is not found
 
         """
-        string = string.strip()
-        if string and not string.endswith(';'):
-            string += ';'
-
-        tok_start = 0
-        last_start = len(string) - 1
-
-        while tok_start < last_start:
-
-            # Identify first non double equal sign
-            sub_start = tok_start
-            while True:
-                pos = string.find('=', sub_start)
-                if pos == -1:
-                    raise ValueError('Token delimiter not found: "="')
-
-                if string[pos+1:pos+2] == '=':
-                    sub_start = pos + 2
-                    continue
-
-                tok_end = pos
-                break
-
-            key = string[tok_start:tok_end]
-
-            tok_start = tok_end + 1
-
-            # Find next non blank character
-            match = cls._re_nonblank.search(string, tok_start)
-            if not match:
-                raise ValueError('No value after key delimiter "="')
-
-            tok_start = match.start(0)
-
-            first = match.group(0)
-            # If first char is not a quote, just search for ';'
-            if first not in cls._quotes:
-                tok_end = string.find(';', tok_start)
-
-            # If quote, find the end of the quotation
-            else:
-                sub_start = tok_start + 1
-                while True:
-                    pos = string.find(first, sub_start)
-                    if pos == -1:
-                        raise ValueError('Token delimiter not found: "%s"' % first)
-
-                    # If it is a double quote, skip and keep searching
-                    if string[pos] == string[pos + 1]:
-                        sub_start = pos + 2
-                        continue
-
-                    tok_end = pos + 1
-                    break
-
-            value = string[tok_start:tok_end].strip()
+        while string:
+            key, string = cls._fetch_key(string)
+            value, string = cls._fetch_value(string)
             yield key, value
-
-            tok_start = tok_end + 1
 
     def copy(self):
         """
@@ -372,7 +366,6 @@ class ConnectionString(object):
                     return getattr(self._store, method_name)(*args, **kwargs)
 
                 proxy.__name__ = bytes(method_name)
-
                 return proxy
 
             container_class = attrs['_container_class']

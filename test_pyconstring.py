@@ -123,8 +123,9 @@ class TestConnectionString(unittest.TestCase):
         Double quotes in literals are converted to one (escaping system)
 
         """
-        obj = ConnectionString.from_string('huehue="troll\'s friend name is ""johnny""";')
+        obj = ConnectionString.from_string('huehue="troll\'s friend name is ""johnny"""  ;key2 =  value')
         self.assertEqual(obj['huehue'], 'troll\'s friend name is "johnny"')
+        self.assertEqual(obj['key2'], 'value')
 
     def test_11(self):
         """
@@ -148,7 +149,7 @@ class TestConnectionString(unittest.TestCase):
 
     def test_13(self):
         """
-        Casting the ConnectionString object returns the connection string
+        Casting the ConnectionString object to unicode/string returns the connection string
 
         """
         con_string = 'Huehue=troll;'
@@ -280,9 +281,9 @@ class TestConnectionString(unittest.TestCase):
         obj = ConnectionString.from_string('Provider=someone;User=bartolo;')
         self.assertEqual((lambda **kw: kw)(**obj), {'Provider': 'someone', 'User': 'bartolo'})
 
-    def test_24(self):
-        """
-        When instantiating from a dictionary, spaces are preserved
-
-        """
-        raise NotImplementedError
+    # def test_24(self):
+    #     """
+    #     When instantiating from a dictionary, spaces are preserved
+    #
+    #     """
+    #     raise NotImplementedError
