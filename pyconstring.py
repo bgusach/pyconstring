@@ -306,7 +306,10 @@ class ConnectionString(object):
         """
         Redirect non defined attributes to underlying store
         """
-        return getattr(self._store, item)
+        try:
+            return getattr(self._store, item)
+        except AttributeError:
+            raise AttributeError("'%s' object does not have attribute '%s'" % (type(self).__name__, item))
 
     def __eq__(self, other):
         return all(self[key] == val for key, val in other.items())
