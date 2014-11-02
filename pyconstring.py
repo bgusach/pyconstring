@@ -2,7 +2,6 @@
 
 from __future__ import unicode_literals
 
-import re
 import sys
 
 from collections import OrderedDict
@@ -10,18 +9,16 @@ from operator import methodcaller
 
 
 __all__ = ['ConnectionString']
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 
 
 class ConnectionString(object):
 
-    # Following attributes can be overridden to customize behaviour
-
-    # Method that processes the key string. Accepts a string and returns a string
-    _key_formatter = staticmethod(methodcaller('title'))
+    # Method that formats the key string. Accepts a string and returns a string
+    _format_key = staticmethod(methodcaller('title'))
 
     # Method that translates the key string. Accepts a string and returns a string
-    _key_translator = staticmethod(lambda k: k)
+    _translate_key = staticmethod(lambda k: k)
 
     # Keys that won't be overridden if they appear more than once in the connection string to be loaded
     _non_overridable_keys = ['Provider']
@@ -29,168 +26,9 @@ class ConnectionString(object):
     # Dict-like class to store the key-value pairs
     _container_class = OrderedDict
 
-    # Methods of the container class to be exposed on the ConnectionString interface
-    _container_exposed_methods = [
-        'keys', 'iterkeys', 'values', 'itervalues', 'viewitems', 'viewvalues',
-        '__iter__', 'get', 'items', 'iteritems', '__len__',
-    ]
-
     def __init__(self):
         self._store = self._container_class()
-        self._formatted_prio_keys = {self._key_formatter(k) for k in self._non_overridable_keys}
-
-    def copy_store(self):
-        """
-        Returns a copy of the inner store
-
-        """
-        return self._store.copy()
-
-    def _load_string(self, string):
-        """
-        Parses and loads an string into `self`
-
-        :param unicode string: connection string to be loaded
-
-        """
-        self._load_pairs(self._fetch_tokens(string.strip()), no_overriding=True)
-
-    def _load_pairs(self, pairs, no_overriding=False):
-        """
-        Loads key-val pairs into `self` not overriding the priority keys
-
-        """
-        pred = self._is_settable if no_overriding else lambda k: True
-
-        for key, value in (self._decode_pair(k, v) for k, v in pairs if pred(k)):
-            self._store_pair(key, value)
-
-    @staticmethod
-    def _decode_key(key):
-        """
-        Decodes the passed key
-
-        :param unicode key: key to be decoded
-        :return: decoded key
-        :rtype: unicode
-        :raises: ValueError
-
-        """
-        if not key:
-            raise ValueError('Key cannot be empty string')
-
-        return key.strip().replace('==', '=')
-
-    @staticmethod
-    def _encode_key(key):
-        """
-        Encodes the passed key
-
-        :param unicode key:
-        :return: encoded key
-        :rtype: unicode
-        :raises: ValueError
-
-        """
-        if not key:
-            raise ValueError('Key cannot be empty string')
-
-        return key.strip().replace('=', '==')
-
-    @classmethod
-    def _decode_value(cls, val):
-        """
-        Decodes the passed value
-
-        :param unicode val: value to be decoded
-        :return: decoded value
-        :rtype: unicode
-        :raises: ValueError
-
-        """
-        val = val.strip()
-
-        # Empty string
-        if not val:
-            return val
-
-        # If it does not start with quotes, no decoding needed
-        start = val[0]
-        if start not in cls._quotes:
-            return val
-
-        # Remove wrapping quotes, and reduce any double inner quote
-        return val[1:-1].replace(start * 2, start)
-
-    @classmethod
-    def _encode_value(cls, val):
-        """
-        Encodes the passed value
-
-        :param unicode val: value to be encoded
-        :return: encoded value
-        :rtype: unicode
-        :raises: ValueError
-
-        """
-        if not val:
-            return val
-
-        # Return if no special characters that would require quoting
-        if not (
-            val.startswith(' ')
-            or val.endswith(' ')
-            or ';' in val
-            or val[0] in cls._quotes  # Starts with quotes
-        ):
-            return val
-
-        # Get what kind of quotes are present in value
-        quotes_in_val = cls._quotes.intersection(val)
-
-        # If no quotes, just use double
-        if not quotes_in_val:
-            return '"%s"' % val
-
-        # If only one type, use the other one to quote around
-        if len(quotes_in_val) == 1:
-            return '{quote}{val}{quote}'.format(val=val, quote=cls._quotes.difference(quotes_in_val).pop())
-
-        # If both types of quotes in string, escape the double quotes by doubling them
-        return '"%s"' % val.replace('"', '""')
-
-    @classmethod
-    def _encode_pair(cls, key, val):
-        """
-        Encodes a pair key-value
-
-        """
-        return cls._encode_key(key), cls._encode_value(val)
-
-    @classmethod
-    def _decode_pair(cls, key, val):
-        """
-        Decodes a pair key-value
-
-        """
-        return cls._decode_key(key), cls._decode_value(val)
-
-    def _store_pair(self, key, value):
-        """
-        Stores key-value pair, applying translation and formatting to the key
-
-        """
-        processed_key = self._key_formatter(self._key_translator(key))
-        self._store[processed_key] = value
-
-    def _is_settable(self, key):
-        """
-        Returns whether the key can be set or not
-
-        :rtype: bool
-
-        """
-        return key not in self._formatted_prio_keys or key not in self._store
+        self._formatted_prio_keys = {self._format_key(k) for k in self._non_overridable_keys}
 
     @classmethod
     def from_string(cls, string):
@@ -202,7 +40,7 @@ class ConnectionString(object):
 
         """
         self = cls()
-        self._load_string(string)
+        self._store_items(self._parse_string(string.lstrip()), allow_prio_overriding=False)
 
         return self
 
@@ -216,7 +54,7 @@ class ConnectionString(object):
 
         """
         self = cls()
-        self._load_pairs(params.iteritems())
+        self._store_items(params.iteritems())
         return self
 
     @classmethod
@@ -229,21 +67,58 @@ class ConnectionString(object):
 
         """
         self = cls()
-        self._load_pairs(iterable)
+        self._store_items(iterable)
         return self
 
-    # Direct Item access needs key formatting
-    __getitem__ = lambda self, key: self._store.__getitem__(self._key_formatter(key))
-    __setitem__ = _store_pair
-    __delitem__ = lambda self, key: self._store.__delitem__(self._key_formatter(key))
-    __contains__ = lambda self, key: self._store.__contains__(self._key_formatter(key))
+    def _store_items(self, items, allow_prio_overriding=True):
+        """
+        Stores key-val items
 
-    _quotes = {'"', "'"}
+        :param bool allow_prio_overriding: flag to allow overriding of priority keys
+
+        """
+        pred = (lambda k: True) if allow_prio_overriding else self._no_prio_conflict
+
+        for key, value in ((k, v) for k, v in items if pred(k)):
+            self._store_item(key, value)
+
+    def _store_item(self, key, value):
+        """
+        Stores key-value pair, applying translation and formatting to the key
+
+        """
+        processed_key = self._format_key(self._translate_key(key))
+        self._store[processed_key] = value
+
+    def _no_prio_conflict(self, key):
+        """
+        Returns whether the key can be set or not taking into account that priority keys cannot be overridden
+
+        :rtype: bool
+
+        """
+        return key not in self._formatted_prio_keys or key not in self._store
 
     @classmethod
-    def _fetch_key(cls, string):
+    def _parse_string(cls, string):
         """
-        Receives a stripped string, identifies the heading key, and returns a tuple (key, rest of the string)
+        Parses the string and returns an iterable of tuples (key, value)
+
+        :raises: ValueError
+
+        """
+        if string:
+            key, string = cls._get_key_from_string(string)
+            value, string = cls._get_value_from_string(string)
+            yield key, value
+
+            for pair in cls._parse_string(string):
+                yield pair
+
+    @classmethod
+    def _get_key_from_string(cls, string):
+        """
+        Receives a leftstripped string, identifies the heading key, and returns a tuple (key, rest of the string)
 
         :param unicode string: substring of connection string
         :returns: rest of string left stripped and without any leading '='
@@ -260,22 +135,28 @@ class ConnectionString(object):
                 start = pos + 2
                 continue
 
-            return string[:pos], string[pos+1:].lstrip()
+            key, rest = string[:pos], string[pos+1:]
+            return cls._decode_key(key), rest.lstrip()
+
+    _quotes = {'"', "'"}
 
     @classmethod
-    def _fetch_value(cls, string):
+    def _get_value_from_string(cls, string):
         """
-        Receives a stripped string, identifies the heading value, and returns a tuple (key, rest of the string)
+        Receives a left stripped string, identifies the heading value, decodes it,
+        and returns a tuple (key, rest of the string)
 
         :param unicode string: substring of connection string
         :returns: rest of string left stripped and without any leading ';'
         :rtype: unicode
+        :raises: ValueError
 
         """
+        # Not starting with quotes
         first = string[0]
         if first not in cls._quotes:
             value, _, string = string.partition(';')
-            return value, string
+            return value.rstrip(), string
 
         start = 1
         while True:
@@ -288,21 +169,87 @@ class ConnectionString(object):
                 start = pos + 2
                 continue
 
-            return string[:pos+1], string[pos+1:].lstrip(' ;')  # Eliminate
+            value, rest = string[:pos+1], string[pos+1:]
+            return cls._decode_value(value.rstrip()), rest.lstrip(' ;')
+
+    @staticmethod
+    def _decode_key(key):
+        """
+        :rtype key: unicode
+        :rtype: unicode
+        :raises: ValueError
+
+        """
+        if not key:
+            raise ValueError('Key cannot be empty string')
+
+        return key.strip().replace('==', '=')
+
+    @staticmethod
+    def _encode_key(key):
+        """
+        :rtype key: unicode
+        :rtype: unicode
+        :raises: ValueError
+
+        """
+        if not key:
+            raise ValueError('Key cannot be empty string')
+
+        return key.strip().replace('=', '==')
 
     @classmethod
-    def _fetch_tokens(cls, string):
+    def _decode_value(cls, val):
         """
-        Parses the string and stores its parameters. Overwrites any existing state.
-
-        :param unicode string: connection string to be loaded
-        :raises: ValueError when an expected token is not found
+        :rtype val: unicode
+        :rtype: unicode
+        :raises: ValueError
 
         """
-        while string:
-            key, string = cls._fetch_key(string)
-            value, string = cls._fetch_value(string)
-            yield key, value
+        val = val.strip()
+
+        if not val:
+            return val
+
+        # If it does not start with quotes, no decoding needed
+        start = val[0]
+        if start not in cls._quotes:
+            return val
+
+        # Remove wrapping quotes, and reduce any double inner quote
+        return val[1:-1].replace(start * 2, start)
+
+    @classmethod
+    def _encode_value(cls, val):
+        """
+        :rtype val: unicode
+        :rtype: unicode
+        :raises: ValueError
+
+        """
+        if not val:
+            return val
+
+        # No special characters that would require quoting
+        if not (
+            val.startswith(' ')
+            or val.endswith(' ')
+            or ';' in val
+            or val[0] in cls._quotes
+        ):
+            return val
+
+        # Get what kind of quotes are present in value
+        quotes_in_val = cls._quotes.intersection(val)
+
+        if not quotes_in_val:
+            return '"%s"' % val
+
+        if len(quotes_in_val) == 1:
+            return '{quote}{val}{quote}'.format(val=val, quote=cls._quotes.difference(quotes_in_val).pop())
+
+        # If both types of quotes in string, escape the double quotes by doubling them
+        return '"%s"' % val.replace('"', '""')
 
     def copy(self):
         """
@@ -314,16 +261,23 @@ class ConnectionString(object):
 
         return copy
 
+    def copy_store(self):
+        """
+        Returns a copy of the inner store
+
+        """
+        return self._store.copy()
+
     def update(self, other):
         """
         Updates the inner store with another ConnectionString object, other dict or iterable key-value pairs
 
         """
         if isinstance(other, (dict, ConnectionString)):
-            self._load_pairs(other.items())
+            self._store_items(other.items())
             return
 
-        self._load_pairs(other)
+        self._store_items(other)
 
     def resolve(self):
         """
@@ -336,7 +290,7 @@ class ConnectionString(object):
             return ''
 
         return ';'.join('%s=%s' % (self._encode_key(k), self._encode_value(v))
-                        for k, v in self._store.iteritems()) + ';'
+                        for k, v in self._store.items()) + ';'
 
     def __unicode__(self):
         return self.resolve()
@@ -348,33 +302,23 @@ class ConnectionString(object):
         string = self.resolve()
         return '<ConnectionString%s>' % ' ' + string if string else ''
 
-    class __metaclass__(type):
+    def __getattr__(self, item):
         """
-        Metaclass to expose declared attributes
-
+        Redirect non defined attributes to underlying store
         """
-        def __new__(mcs, cls_name, bases, attrs):
+        return getattr(self._store, item)
 
-            def create_proxy(method_name):
-                """
-                Creates a function that redirects the call to the underlying store object for the `method_name`
+    def __eq__(self, other):
+        return all(self[key] == val for key, val in other.items())
 
-                :param bytes method_name: name of method to be exposed
+    def __ne__(self, other):
+        return not self == other
 
-                """
-                def proxy(self, *args, **kwargs):
-                    return getattr(self._store, method_name)(*args, **kwargs)
-
-                proxy.__name__ = bytes(method_name)
-                return proxy
-
-            container_class = attrs['_container_class']
-
-            # Expose the declared attributes, (as longs as the exist in the container class)
-            attrs.update(
-                (name, create_proxy(name))
-                for name in filter(lambda attr: hasattr(container_class, attr), attrs.pop('_container_exposed_methods'))
-            )
-
-            return type(cls_name, bases, attrs)
+    # Magic methods to be redirected to underlying store
+    __setitem__ = _store_item
+    __getitem__ = lambda self, key: self._store.__getitem__(self._format_key(key))
+    __delitem__ = lambda self, key: self._store.__delitem__(self._format_key(key))
+    __contains__ = lambda self, key: self._store.__contains__(self._format_key(key))
+    __len__ = lambda self: len(self._store)
+    __iter__ = lambda self: iter(self._store)
 

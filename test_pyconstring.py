@@ -26,7 +26,7 @@ class TestConnectionString(unittest.TestCase):
         }
         obj = ConnectionString.from_string(cs)
 
-        for key, val in expected.iteritems():
+        for key, val in expected.items():
             self.assertEqual(obj[key], val)
 
     def test_2(self):
@@ -44,9 +44,9 @@ class TestConnectionString(unittest.TestCase):
         expected = {
             prio_key: 'initial',
         }
-        obj = ConnectionString.from_string(';'.join('%s=%s' % p for p in pairs) + ';')
+        obj = ConnectionString.from_string(';'.join('%s=%s' % p for p in pairs))
 
-        for key, val in expected.iteritems():
+        for key, val in expected.items():
             self.assertEqual(obj[key], val)
 
     def test_3(self):
@@ -88,7 +88,7 @@ class TestConnectionString(unittest.TestCase):
 
         # Now with another key formatter
         class ConnStr2(ConnectionString):
-            _key_formatter = staticmethod(lambda k: k.upper())
+            _format_key = staticmethod(lambda k: k.upper())
 
         obj = ConnStr2.from_string('key=value;')
         self.assertTrue('KEY' in obj.resolve())
@@ -107,7 +107,7 @@ class TestConnectionString(unittest.TestCase):
         Value starting with = and properly quoted, is read properly
 
         """
-        obj = ConnectionString.from_string('key="=value";')
+        obj = ConnectionString.from_string('key="=value" ;')
         self.assertEqual(obj['key'], '=value')
 
     def test_9(self):
@@ -203,7 +203,7 @@ class TestConnectionString(unittest.TestCase):
         obj = ConnectionString.from_string('Huehue=troll;')
         d = {'huehue': 'shutupandtakemymoney'}
 
-        obj.update(d.iteritems())
+        obj.update(d.items())
         self.assertEqual(obj['Huehue'], 'shutupandtakemymoney')
 
     def test_18(self):
@@ -222,7 +222,7 @@ class TestConnectionString(unittest.TestCase):
 
         """
         d = {'huehue': 'troll'}
-        obj = ConnectionString.from_iterable(d.iteritems())
+        obj = ConnectionString.from_iterable(d.items())
 
         self.assertEqual(obj['Huehue'], 'troll')
 
@@ -262,7 +262,7 @@ class TestConnectionString(unittest.TestCase):
         class ConStr2(ConnectionString):
 
             @staticmethod
-            def _key_translator(key):
+            def _translate_key(key):
                 key = key.lower()
                 return {
                     'one': 'eins',
@@ -281,9 +281,36 @@ class TestConnectionString(unittest.TestCase):
         obj = ConnectionString.from_string('Provider=someone;User=bartolo;')
         self.assertEqual((lambda **kw: kw)(**obj), {'Provider': 'someone', 'User': 'bartolo'})
 
-    # def test_24(self):
-    #     """
-    #     When instantiating from a dictionary, spaces are preserved
-    #
-    #     """
-    #     raise NotImplementedError
+    def test_24(self):
+        """
+        When instantiating from a dictionary, spaces are preserved
+
+        """
+        d = {
+            'User Id': '  gertrud',
+            'Initial Catalog': 'abc  ',
+        }
+        obj = ConnectionString.from_dict(d)
+
+        for key, value in d.items():
+            self.assertEqual(obj[key], value)
+
+    def test_25(self):
+        """
+        Connection string object is directly iterable
+
+        """
+        obj = ConnectionString.from_string('Provider=someone;User=bartolo;')
+        self.assertEqual(list(obj), ['Provider', 'User'])
+
+    def test_26(self):
+        """
+        Comparison works fine
+
+        """
+        obj1 = ConnectionString.from_string('Provider=someone;User=bartolo;')
+        obj2 = ConnectionString.from_iterable(obj1.items())
+        self.assertEqual(obj1, obj2)
+
+        obj2['Provider'] = 'somebody else'
+        self.assertNotEqual(obj1, obj2)
