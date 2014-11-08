@@ -17,17 +17,14 @@ class ConnectionString(object):
     # Method that formats the key string. Accepts a string and returns a string
     _format_key = staticmethod(methodcaller('title'))
 
-    # Method that translates the key string. Accepts a string and returns a string
-    _translate_key = staticmethod(lambda k: k)
-
     # Keys that won't be overridden if they appear more than once in the connection string to be loaded
     _non_overridable_keys = ['Provider']
 
     # Dict-like class to store the key-value pairs
-    _container_class = OrderedDict
+    _store_class = OrderedDict
 
     def __init__(self):
-        self._store = self._container_class()
+        self._store = self._store_class()
         self._formatted_prio_keys = {self._format_key(k) for k in self._non_overridable_keys}
 
     @classmethod
@@ -54,7 +51,7 @@ class ConnectionString(object):
 
         """
         self = cls()
-        self._store_items(params.iteritems())
+        self._store_items(params.items())
         return self
 
     @classmethod
@@ -84,11 +81,10 @@ class ConnectionString(object):
 
     def _store_item(self, key, value):
         """
-        Stores key-value pair, applying translation and formatting to the key
+        Stores key-value pair, applying formatting to the key
 
         """
-        processed_key = self._format_key(self._translate_key(key))
-        self._store[processed_key] = value
+        self._store[self._format_key(key)] = value
 
     def _no_prio_conflict(self, key):
         """
@@ -252,10 +248,6 @@ class ConnectionString(object):
         return '"%s"' % val.replace('"', '""')
 
     def copy(self):
-        """
-        Returns a copy of this ConnectionString object
-
-        """
         copy = type(self)()
         copy.update(self)
 
@@ -272,6 +264,8 @@ class ConnectionString(object):
         """
         Updates the inner store with another ConnectionString object, other dict or iterable key-value pairs
 
+        :type other: ConnectionString | dict | iterable of tuples
+
         """
         if isinstance(other, (dict, ConnectionString)):
             self._store_items(other.items())
@@ -279,7 +273,26 @@ class ConnectionString(object):
 
         self._store_items(other)
 
-    def resolve(self):
+    def translate(self, trans, strict=True):
+        """
+        Translates the keys of the store. Keys not defined in the mapping
+        will not be
+
+        :param dict trans: translation mapping {pre name: post name}
+        :param bool strict: When strict, the existing keys in self that
+                            are not in `trans` will be removed. If not strict,
+                            they will still exist.
+
+        """
+        trans = {self._format_key(key): value for key, value in trans.items()}
+        pred = trans.__contains__ if strict else lambda x: True
+
+        translated_items = [(trans.get(key, key), value) for key, value in self.items() if pred(key)]
+
+        self.clear()
+        self._store_items(translated_items)
+
+    def get_string(self):
         """
         Returns the composed string
 
@@ -293,23 +306,24 @@ class ConnectionString(object):
                         for k, v in self._store.items()) + ';'
 
     def __unicode__(self):
-        return self.resolve()
+        return self.get_string()
 
     def __str__(self):
-        return self.resolve() if sys.version_info > (3, 0) else self.resolve().encode('utf-8')
+        return self.get_string() if sys.version_info > (3, 0) else self.get_string().encode('utf-8')
 
     def __repr__(self):
-        string = self.resolve()
+        string = self.get_string()
         return '<ConnectionString%s>' % ' ' + string if string else ''
 
     def __getattr__(self, item):
         """
         Redirect non defined attributes to underlying store
+
         """
         try:
             return getattr(self._store, item)
         except AttributeError:
-            raise AttributeError("'%s' object does not have attribute '%s'" % (type(self).__name__, item))
+            raise AttributeError("'%s' object have no attribute '%s'" % (type(self).__name__, item))
 
     def __eq__(self, other):
         return all(self[key] == val for key, val in other.items())

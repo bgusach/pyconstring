@@ -84,14 +84,14 @@ class TestConnectionString(unittest.TestCase):
         """
         obj = ConnectionString.from_string('cool key  =value;')
 
-        assert 'Cool Key' in obj.resolve()
+        assert 'Cool Key' in obj.get_string()
 
         # Now with another key formatter
         class ConnStr2(ConnectionString):
             _format_key = staticmethod(lambda k: k.upper())
 
         obj = ConnStr2.from_string('key=value;')
-        self.assertTrue('KEY' in obj.resolve())
+        self.assertTrue('KEY' in obj.get_string())
 
     def test_7(self):
         """
@@ -254,25 +254,6 @@ class TestConnectionString(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ConnectionString.from_string(s)
 
-    def test_22(self):
-        """
-        Translator works
-
-        """
-        class ConStr2(ConnectionString):
-
-            @staticmethod
-            def _translate_key(key):
-                key = key.lower()
-                return {
-                    'one': 'eins',
-                    'two': 'dos',
-                    'user': 'huehue'
-                }.get(key, key)
-
-        obj = ConStr2.from_string('One=1;Two=2;User=me;Unknown=33;')
-        self.assertEqual(obj.resolve(), 'Eins=1;Dos=2;Huehue=me;Unknown=33;')
-
     def test_23(self):
         """
         Star unpacking works
@@ -314,3 +295,36 @@ class TestConnectionString(unittest.TestCase):
 
         obj2['Provider'] = 'somebody else'
         self.assertNotEqual(obj1, obj2)
+
+    def test_27(self):
+        """
+        Simple translation works. Formatting is irrelevant
+
+        """
+        obj = ConnectionString.from_string('User=bartolo;')
+        obj.translate({'USER': 'usr'})
+        self.assertEqual(obj['usr'], 'bartolo')
+
+    def test_28(self):
+        """
+        After calling .translate in strict mode, only keys existing in the translation
+        dictionary stay after the process
+
+        """
+        obj = ConnectionString.from_string('User=bartolo;key2=val2;')
+        obj.translate({'USER': 'usr'})
+        self.assertEqual(obj['usr'], 'bartolo')
+        assert 'key2' not in obj
+
+    def test_29(self):
+        """
+        After calling .translate in non strict mode, keys not existing in the translation
+        dictionary still exist after the process
+
+        """
+        obj = ConnectionString.from_string('User=bartolo;key2=val2;')
+        obj.translate({'USER': 'usr'}, strict=False)
+
+        assert len(obj) == 2
+        self.assertEqual(obj['usr'], 'bartolo')
+        self.assertEqual(obj['key2'], 'val2')
