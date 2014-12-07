@@ -271,8 +271,7 @@ class ConnectionString(object):
 
     def translate(self, trans, strict=True):
         """
-        Translates the keys of the store. Keys not defined in the mapping
-        will not be
+        Translates the keys of the store.
 
         :param dict trans: translation mapping {pre name: post name}
         :param bool strict: When strict, the existing keys in self that
