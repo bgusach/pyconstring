@@ -14,18 +14,14 @@ __version__ = '0.2.0'
 
 class ConnectionString(object):
 
-    # Method that formats the key string. Accepts a string and returns a string
-    _format_key = staticmethod(methodcaller('title'))
+    def __init__(self):
+        self._store = self._store_factory()
+        self._formatted_prio_keys = {self._format_key(k) for k in self._non_overridable_keys}
 
     # Keys that won't be overridden if they appear more than once in the connection string to be loaded
     _non_overridable_keys = ['Provider']
-
-    # Dict-like class to store the key-value pairs
-    _store_class = OrderedDict
-
-    def __init__(self):
-        self._store = self._store_class()
-        self._formatted_prio_keys = {self._format_key(k) for k in self._non_overridable_keys}
+    _store_factory = OrderedDict
+    _format_key = staticmethod(methodcaller('title'))
 
     @classmethod
     def from_string(cls, string):
