@@ -7,7 +7,6 @@ Unittests for pyconstring
 from __future__ import unicode_literals
 
 import unittest
-import itertools
 
 from pyconstring import ConnectionString
 
@@ -55,7 +54,7 @@ class TestConnectionString(unittest.TestCase):
 
         """
         template = '==hu%sehue  ;=='
-        for q1, q2 in itertools.product('"', "'"):
+        for q1, q2 in [('"', "'"), ("'", '"')]:
             val = template % q2  # Insert a quote of the other type to make it more messy
             cs = 'Key1={q1}{val}{q1};'.format(q1=q1, val=val)
             obj = ConnectionString.from_string(cs)
