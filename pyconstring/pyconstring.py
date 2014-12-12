@@ -244,6 +244,12 @@ class ConnectionString(object):
         return '"%s"' % val.replace('"', '""')
 
     def copy(self):
+        """
+        Returns a copy of the current ConnectionString
+
+        :rtype: ConnectionString
+
+        """
         copy = type(self)()
         copy.update(self)
 
@@ -253,14 +259,15 @@ class ConnectionString(object):
         """
         Returns a copy of the inner store
 
+        :rtype: OrderedDict
         """
         return self._store.copy()
 
     def update(self, other):
         """
-        Updates the inner store with another ConnectionString object, other dict or iterable key-value pairs
+        Updates the state of self with another ConnectionString object, other dict or iterable key-value pairs
 
-        :type other: ConnectionString | dict | iterable of tuples
+        :type other: ConnectionString|dict|iterable of tuples
 
         """
         if isinstance(other, (dict, ConnectionString)):
