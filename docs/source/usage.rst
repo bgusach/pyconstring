@@ -52,6 +52,13 @@ dictionary. Some examples of this::
     >>> list(cs)
     [u'Key2']
     >>> cs['key3'] = 'hey'
+    >>> cs2 = ConnectionString.from_string('hello=world;')
+    >>> cs == cs2
+    False
+    >>> cs == cs
+    True
+
+Check the :ref:`API<api>` for more details.
 
 
 Key translations made easy. For instance, useful to convert from ADODB parameters

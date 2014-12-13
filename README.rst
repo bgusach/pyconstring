@@ -54,4 +54,4 @@ Key translation::
     >>> print cs.get_string()
     Clave=value;
 
-
+More information in the `documentation <http://pythonhosted.org//pyconstring/>`__.

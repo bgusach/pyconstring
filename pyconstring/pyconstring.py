@@ -9,7 +9,7 @@ from operator import methodcaller
 
 
 __all__ = ['ConnectionString']
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 
 
 class ConnectionString(object):
@@ -296,8 +296,7 @@ class ConnectionString(object):
 
     def get_string(self):
         """
-        Returns the composed string
-
+        :returns: the composed connection string
         :rtype: unicode
 
         """

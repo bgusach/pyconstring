@@ -6,9 +6,13 @@ from __future__ import unicode_literals
 from setuptools import setup
 import pyconstring
 
+
 def read_file(path):
-    with open(path) as f:
-        return f.read()
+    try:
+        with open(path) as f:
+            return f.read()
+    except IOError:
+        return ''
 
 setup(
     name='pyconstring',
