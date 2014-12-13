@@ -23,7 +23,7 @@ Usage examples
 --------------
 Constructing a connection string from scratch:
 
-..code:: python
+.. code:: python
     >>> from pyconstring import ConnectionString
     >>> cs = ConnectionString()
     >>> cs['user'] = 'manuel'
@@ -33,7 +33,7 @@ Constructing a connection string from scratch:
 
 Parsing an already existing string:
 
-..code:: python
+.. code:: python
     >>> cs = ConnectionString.from_string('key1=value1;key2=value2;')
     >>> cs['key1'] = 'another value'
     >>> cs.get_string()
