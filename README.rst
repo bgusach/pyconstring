@@ -44,7 +44,7 @@ Parsing an already existing string:
 
 Automated escaping when necessary:
 
-..code:: python
+.. code:: python
     >>> cs = ConnectionString()
     >>> cs['weird=key'] = '" weird;value  '
     >>> print cs.get_string()
@@ -52,7 +52,7 @@ Automated escaping when necessary:
 
 Key translation:
 
-..code:: python
+.. code:: python
     >>> cs['key'] = 'value'
     >>> cs.translate({'key': 'clave'})
     >>> print cs.get_string()
