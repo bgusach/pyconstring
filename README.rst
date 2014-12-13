@@ -9,6 +9,15 @@ License
 MIT. See `License File <https://github.com/ikaros45/pyconstring/blob/master/LICENSE>`__.
 
 
+Install
+-------
+``pyconstring`` is on PyPI::
+
+    pip install pyconstring
+
+or::
+    easy_install pyconstring
+
 Usage examples
 --------------
 Constructing a connection string from scratch::
