@@ -9,7 +9,7 @@ from operator import methodcaller
 
 
 __all__ = ['ConnectionString']
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 
 
 class ConnectionString(object):
