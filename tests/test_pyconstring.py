@@ -292,8 +292,9 @@ class TestConnectionString(unittest.TestCase):
         obj2 = ConnectionString.from_iterable(obj1.items())
         self.assertEqual(obj1, obj2)
 
-        obj2['Provider'] = 'somebody else'
-        self.assertNotEqual(obj1, obj2)
+        obj2['timeout'] = '78'
+        assert obj1 != obj2
+        assert obj2 != obj1
 
     def test_27(self):
         """

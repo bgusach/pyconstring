@@ -325,10 +325,10 @@ class ConnectionString(object):
         try:
             return getattr(self._store, item)
         except AttributeError:
-            raise AttributeError("'%s' object have no attribute '%s'" % (type(self).__name__, item))
+            raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, item))
 
     def __eq__(self, other):
-        return all(self[key] == val for key, val in other.items())
+        return self._store == other.copy_store()
 
     def __ne__(self, other):
         return not self == other
