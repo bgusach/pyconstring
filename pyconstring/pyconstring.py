@@ -9,18 +9,17 @@ from operator import methodcaller
 
 
 __all__ = ['ConnectionString']
-__version__ = '0.4.0'
+__version__ = '0.5.0'
 
 
-class ConnectionString(object):
+class ConnectionString(OrderedDict):
 
-    def __init__(self):
-        self._store = self._store_factory()
+    def __init__(self, *args, **kwargs):
         self._formatted_prio_keys = {self._format_key(k) for k in self._non_overridable_keys}
+        super(ConnectionString, self).__init__(*args, **kwargs)
 
     # Keys that won't be overridden if they appear more than once in the connection string to be loaded
     _non_overridable_keys = ['Provider']
-    _store_factory = OrderedDict
     _format_key = staticmethod(methodcaller('title'))
 
     @classmethod
@@ -37,32 +36,6 @@ class ConnectionString(object):
 
         return self
 
-    @classmethod
-    def from_dict(cls, params):
-        """
-        Creates instance and loads the passed parameters on it
-
-        :param dict params: parameters to be loaded
-        :rtype: ConnectionString
-
-        """
-        self = cls()
-        self._store_items(params.items())
-        return self
-
-    @classmethod
-    def from_iterable(cls, iterable):
-        """
-        Creates instance and loads the passed iterable of key-values on it
-
-        :param iterable: iterable of key-values
-        :rtype: ConnectionString
-
-        """
-        self = cls()
-        self._store_items(iterable)
-        return self
-
     def _store_items(self, items, allow_prio_overriding=True):
         """
         Stores key-val items
@@ -72,15 +45,10 @@ class ConnectionString(object):
         """
         pred = (lambda k: True) if allow_prio_overriding else self._no_prio_conflict
 
-        for key, value in ((k, v) for k, v in items if pred(k)):
-            self._store_item(key, value)
+        self.update((k, v) for k, v in items if pred(k))
 
-    def _store_item(self, key, value):
-        """
-        Stores key-value pair, applying formatting to the key
-
-        """
-        self._store[self._format_key(key)] = value
+    def __setitem__(self, key, value, *args, **kwargs):
+        super(ConnectionString, self).__setitem__(self._format_key(key), value, *args, **kwargs)
 
     def _no_prio_conflict(self, key):
         """
@@ -89,7 +57,7 @@ class ConnectionString(object):
         :rtype: bool
 
         """
-        return key not in self._formatted_prio_keys or key not in self._store
+        return key not in self._formatted_prio_keys or key not in self
 
     @classmethod
     def _parse_string(cls, string):
@@ -99,13 +67,10 @@ class ConnectionString(object):
         :raises: ValueError
 
         """
-        if string:
+        while string:
             key, string = cls._get_key_from_string(string)
             value, string = cls._get_value_from_string(string)
             yield key, value
-
-            for pair in cls._parse_string(string):
-                yield pair
 
     @classmethod
     def _get_key_from_string(cls, string):
@@ -166,12 +131,6 @@ class ConnectionString(object):
 
     @staticmethod
     def _decode_key(key):
-        """
-        :rtype key: unicode
-        :rtype: unicode
-        :raises: ValueError
-
-        """
         if not key:
             raise ValueError('Key cannot be empty string')
 
@@ -179,12 +138,6 @@ class ConnectionString(object):
 
     @staticmethod
     def _encode_key(key):
-        """
-        :rtype key: unicode
-        :rtype: unicode
-        :raises: ValueError
-
-        """
         if not key:
             raise ValueError('Key cannot be empty string')
 
@@ -192,12 +145,6 @@ class ConnectionString(object):
 
     @classmethod
     def _decode_value(cls, val):
-        """
-        :rtype val: unicode
-        :rtype: unicode
-        :raises: ValueError
-
-        """
         val = val.strip()
 
         if not val:
@@ -213,12 +160,6 @@ class ConnectionString(object):
 
     @classmethod
     def _encode_value(cls, val):
-        """
-        :rtype val: unicode
-        :rtype: unicode
-        :raises: ValueError
-
-        """
         if not val:
             return val
 
@@ -242,39 +183,6 @@ class ConnectionString(object):
 
         # If both types of quotes in string, escape the double quotes by doubling them
         return '"%s"' % val.replace('"', '""')
-
-    def copy(self):
-        """
-        Returns a copy of the current ConnectionString
-
-        :rtype: ConnectionString
-
-        """
-        copy = type(self)()
-        copy.update(self)
-
-        return copy
-
-    def copy_store(self):
-        """
-        Returns a copy of the inner store
-
-        :rtype: OrderedDict
-        """
-        return self._store.copy()
-
-    def update(self, other):
-        """
-        Updates the state of self with another ConnectionString object, other dict or iterable key-value pairs
-
-        :type other: ConnectionString|dict|iterable of tuples
-
-        """
-        if isinstance(other, (dict, ConnectionString)):
-            self._store_items(other.items())
-            return
-
-        self._store_items(other)
 
     def translate(self, trans, strict=True):
         """
@@ -300,11 +208,11 @@ class ConnectionString(object):
         :rtype: unicode
 
         """
-        if not self._store:
+        if not self:
             return ''
 
         return ';'.join('%s=%s' % (self._encode_key(k), self._encode_value(v))
-                        for k, v in self._store.items()) + ';'
+                        for k, v in self.items()) + ';'
 
     def __unicode__(self):
         return self.get_string()
@@ -313,30 +221,9 @@ class ConnectionString(object):
         return self.get_string() if sys.version_info > (3, 0) else self.get_string().encode('utf-8')
 
     def __repr__(self):
-        string = self.get_string()
-        return '<ConnectionString%s>' % ' ' + string if string else ''
+        return '<ConnectionString \'%s\'>' % self.get_string()
 
-    def __getattr__(self, item):
-        """
-        Redirect non defined attributes to underlying store
-
-        """
-        try:
-            return getattr(self._store, item)
-        except AttributeError:
-            raise AttributeError("'%s' object has no attribute '%s'" % (type(self).__name__, item))
-
-    def __eq__(self, other):
-        return self._store == other.copy_store()
-
-    def __ne__(self, other):
-        return not self == other
-
-    # Magic methods to be redirected to underlying store
-    __setitem__ = _store_item
-    __getitem__ = lambda self, key: self._store.__getitem__(self._format_key(key))
-    __delitem__ = lambda self, key: self._store.__delitem__(self._format_key(key))
-    __contains__ = lambda self, key: self._store.__contains__(self._format_key(key))
-    __len__ = lambda self: len(self._store)
-    __iter__ = lambda self: iter(self._store)
+    __getitem__ = lambda self, key: super(ConnectionString, self).__getitem__(self._format_key(key))
+    __delitem__ = lambda self, key: super(ConnectionString, self).__delitem__(self._format_key(key))
+    __contains__ = lambda self, key: super(ConnectionString, self).__contains__(self._format_key(key))
 

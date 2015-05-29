@@ -7,3 +7,4 @@ pyconstring's documentation
    usage
    rules
    api
+   releasenotes

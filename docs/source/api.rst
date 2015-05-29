@@ -1,7 +1,7 @@
 API
 ===
 
-The ConnectionString class offers the same same API as the underlying dictionary,
+The ConnectionString class has the same API as standard dictionary,
 plus the following methods:
 
 

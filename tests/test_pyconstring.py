@@ -211,7 +211,7 @@ class TestConnectionString(unittest.TestCase):
 
         """
         d = {'huehue': 'troll'}
-        obj = ConnectionString.from_dict(d)
+        obj = ConnectionString(d)
 
         self.assertEqual(obj['Huehue'], 'troll')
 
@@ -221,7 +221,7 @@ class TestConnectionString(unittest.TestCase):
 
         """
         d = {'huehue': 'troll'}
-        obj = ConnectionString.from_iterable(d.items())
+        obj = ConnectionString(d.items())
 
         self.assertEqual(obj['Huehue'], 'troll')
 
@@ -230,7 +230,7 @@ class TestConnectionString(unittest.TestCase):
         Deleting works
 
         """
-        obj = ConnectionString.from_dict({'huehue': 'troll'})
+        obj = ConnectionString({'huehue': 'troll'})
         assert 'huehue' in obj
         del obj['huehue']
         assert 'huehue' not in obj
@@ -270,7 +270,7 @@ class TestConnectionString(unittest.TestCase):
             'User Id': '  gertrud',
             'Initial Catalog': 'abc  ',
         }
-        obj = ConnectionString.from_dict(d)
+        obj = ConnectionString(d)
 
         for key, value in d.items():
             self.assertEqual(obj[key], value)
@@ -289,7 +289,7 @@ class TestConnectionString(unittest.TestCase):
 
         """
         obj1 = ConnectionString.from_string('Provider=someone;User=bartolo;')
-        obj2 = ConnectionString.from_iterable(obj1.items())
+        obj2 = ConnectionString(obj1.items())
         self.assertEqual(obj1, obj2)
 
         obj2['timeout'] = '78'

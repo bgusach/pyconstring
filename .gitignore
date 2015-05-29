@@ -1,6 +1,7 @@
 .idea
 *.pyc
 todo.txt
+_howtobuild
 build/
 dist/
 pyconstring.egg-info/
