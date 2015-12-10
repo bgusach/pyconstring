@@ -2,7 +2,7 @@ pyconstring
 ===========
 
 Tool to handle connection strings. Offers an easy API that parses and constructs connection strings
-in the form of ``Key=Value;``, as easy as handling a dictionary. Works with both Python 2 and 3
+in the form of ``Key=Value;``, as easy as handling a dictionary. Works with both Python 2.7 and 3.x
 
 License
 -------
