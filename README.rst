@@ -1,3 +1,7 @@
+.. image:: https://img.shields.io/travis/bgusach/pyconstring/master.svg
+    :alt: Travis-CI badge
+    :target: https://travis-ci.org/bgusach/pyconstring
+
 pyconstring
 ===========
 
