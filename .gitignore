@@ -5,3 +5,7 @@ _howtobuild
 build/
 dist/
 pyconstring.egg-info/
+env
+.tox
+.python-version
+

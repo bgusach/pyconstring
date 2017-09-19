@@ -1,10 +1,7 @@
 # coding: utf-8
 
-from __future__ import unicode_literals
-
-
 from setuptools import setup
-import pyconstring
+from setuptools import find_packages
 
 
 def read_file(path):
@@ -14,21 +11,23 @@ def read_file(path):
     except IOError:
         return ''
 
+
 setup(
     name='pyconstring',
-    version=pyconstring.__version__,
+    version='1.0.0',
     description='Tool to handle connection strings',
     long_description=read_file('README.rst'),
-    url='https://github.com/ikaros45/pyconstring',
+    url='https://github.com/bgusach/pyconstring',
     author='Bor González-Usach',
     author_email='bgusach@gmail.com',
     license='MIT',
-    packages=[b'pyconstring', b'tests'],
     keywords='connection string',
     zip_safe=True,
+    package_dir={'': 'src'},
+    packages=find_packages('src'),
     classifiers=[
         'License :: OSI Approved :: MIT License',
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Operating System :: OS Independent',
         'Topic :: Database',
         'Topic :: Utilities',

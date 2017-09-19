@@ -1,0 +1,2 @@
+install: make env
+script: make tests
