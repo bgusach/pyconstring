@@ -2,6 +2,11 @@
     :alt: Travis-CI badge
     :target: https://travis-ci.org/bgusach/pyconstring
 
+
+.. image:: https://readthedocs.org/projects/pyconstring/badge/?version=latest
+   :alt: Read the Docs
+   :target: http://pyconstring.readthedocs.io/en/latest/?badge=latest
+
 pyconstring
 ===========
 
@@ -66,6 +71,6 @@ Key translation:
     >>> print cs.get_string()
     Clave=value;
 
-More information in the `documentation <http://pythonhosted.org//pyconstring/>`__.
+More information in the `documentation <http://pyconstring.readthedocs.io/en/latest/?badge=latest>`__.
 
 If you find any bug or have any suggestion, feel free to send me an email or open an issue on github.
