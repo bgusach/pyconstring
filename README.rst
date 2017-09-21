@@ -7,6 +7,11 @@
    :alt: Read the Docs
    :target: http://pyconstring.readthedocs.io/en/latest/?badge=latest
 
+
+.. image:: https://img.shields.io/pypi/v/pyconstring.svg
+   :alt: PyPI Version
+   :target: https://pypi.python.org/pypi/pyconstring/
+
 pyconstring
 ===========
 
